@@ -142,12 +142,21 @@ object CSR
   val nHPM = nCtr - firstHPM
   val hpmWidth = 40
 
+  val firstESM = CSRs.esmcounter0
+  val esmWidth = 40
+  val ESM_LOG_PRINTF = true
+
   val maxPMPs = 16
 }
 
 class PerfCounterIO(implicit p: Parameters) extends CoreBundle
     with HasCoreParameters {
   val eventSel = UInt(OUTPUT, xLen)
+  val inc = UInt(INPUT, log2Ceil(1+retireWidth))
+}
+
+class ESMCounterIO(implicit p: Parameters) extends CoreBundle
+    with HasCoreParameters {
   val inc = UInt(INPUT, log2Ceil(1+retireWidth))
 }
 
@@ -209,6 +218,8 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
   val counters = Vec(nPerfCounters, new PerfCounterIO)
   val inst = Vec(retireWidth, UInt(width = iLen)).asInput
   val trace = Vec(retireWidth, new TracedInstruction).asOutput
+
+  val esmcounters = Vec(nESMCounters, new ESMCounterIO)
 }
 
 class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Parameters) extends CoreModule()(p)
@@ -308,6 +319,8 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
   val reg_hpmcounter = io.counters.map(c => WideCounter(CSR.hpmWidth, c.inc, reset = false))
   val hpm_mask = reg_mcounteren & Mux((!usingVM).B || reg_mstatus.prv === PRV.S, delegable_counters.U, reg_scounteren)
 
+  val reg_esmcounter = io.esmcounters.map(c => WideCounter(CSR.esmWidth, c.inc))
+
   val mip = Wire(init=reg_mip)
   mip.lip := (io.interrupts.lip: Seq[Bool])
   mip.mtip := io.interrupts.mtip
@@ -392,6 +405,10 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
         read_mapping += (i + CSR.firstMHPCH) -> c // mhpmcounterNh
         if (usingUser) read_mapping += (i + CSR.firstHPCH) -> c // hpmcounterNh
       }
+    }
+
+    for ((c, i) <- reg_esmcounter.map(x => x: UInt) zipWithIndex) {
+      read_mapping += (i + CSR.firstESM) -> c // esmcounterN
     }
 
     if (usingUser) {
@@ -687,6 +704,11 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
       writeCounter(i + CSR.firstMHPC, c, wdata)
       when (decoded_addr(i + CSR.firstHPE)) { e := perfEventSets.maskEventSelector(wdata) }
     }
+
+    for ((c, i) <- reg_esmcounter zipWithIndex) {
+      writeCounter(i + CSR.firstESM, c, wdata)
+    }
+
     if (coreParams.haveBasicCounters) {
       writeCounter(CSRs.mcycle, reg_cycle, wdata)
       writeCounter(CSRs.minstret, reg_instret, wdata)
@@ -865,4 +887,14 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
   def readEPC(x: UInt) = ~(~x | Mux(reg_misa('c' - 'a'), 1.U, 3.U))
   def isaStringToMask(s: String) = s.map(x => 1 << (x - 'A')).foldLeft(0)(_|_)
   def formFS(fs: UInt) = if (coreParams.haveFSDirty) fs else Fill(2, fs.orR)
+
+  if (CSR.ESM_LOG_PRINTF) {
+    when (reg_esmcounter(0).value === UInt(0)) {
+      for (w <- 0 until nESMCounters) {
+        printf("esm %d: 0x%x\n", w, reg_esmcounter(w))
+      }
+    }
+  }
+
+
 }

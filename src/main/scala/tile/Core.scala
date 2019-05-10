@@ -71,6 +71,7 @@ trait HasCoreParameters extends HasTileParameters {
   val nPMPs = coreParams.nPMPs
   val pmpGranularity = coreParams.pmpGranularity
   val nPerfCounters = coreParams.nPerfCounters
+  val nESMCounters = 15
   val mtvecInit = coreParams.mtvecInit
   val mtvecWritable = coreParams.mtvecWritable
 

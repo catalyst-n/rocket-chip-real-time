@@ -495,6 +495,23 @@ object CSRs {
   val mhpmcounter29h = 0xb9d
   val mhpmcounter30h = 0xb9e
   val mhpmcounter31h = 0xb9f
+
+  val esmcounter0 = 0x800
+  val esmcounter1 = 0x801
+  val esmcounter2 = 0x802
+  val esmcounter3 = 0x803
+  val esmcounter4 = 0x804
+  val esmcounter5 = 0x805
+  val esmcounter6 = 0x806
+  val esmcounter7 = 0x807
+  val esmcounter8 = 0x808
+  val esmcounter9 = 0x809
+  val esmcounter10 = 0x80a
+  val esmcounter11 = 0x80b
+  val esmcounter12 = 0x80c
+  val esmcounter13 = 0x80d
+  val esmcounter14 = 0x80e
+
   val all = {
     val res = ArrayBuffer[Int]()
     res += fflags
@@ -645,6 +662,23 @@ object CSRs {
     res += marchid
     res += mimpid
     res += mhartid
+
+    res += esmcounter0
+    res += esmcounter1
+    res += esmcounter2
+    res += esmcounter3
+    res += esmcounter4
+    res += esmcounter5
+    res += esmcounter6
+    res += esmcounter7
+    res += esmcounter8
+    res += esmcounter9
+    res += esmcounter10
+    res += esmcounter11
+    res += esmcounter12
+    res += esmcounter13
+    res += esmcounter14
+
     res.toArray
   }
   val all32 = {
