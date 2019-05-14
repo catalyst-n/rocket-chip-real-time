@@ -9,8 +9,10 @@ import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.tile._
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property._
+
 import scala.collection.mutable.LinkedHashMap
 import Instructions._
+import chisel3.core
 
 class MStatus extends Bundle {
   // not truly part of mstatus, but convenient
@@ -144,7 +146,6 @@ object CSR
 
   val firstESM = CSRs.esmcounter0
   val esmWidth = 40
-  val ESM_LOG_PRINTF = true
 
   val maxPMPs = 16
 }
@@ -319,7 +320,7 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
   val reg_hpmcounter = io.counters.map(c => WideCounter(CSR.hpmWidth, c.inc, reset = false))
   val hpm_mask = reg_mcounteren & Mux((!usingVM).B || reg_mstatus.prv === PRV.S, delegable_counters.U, reg_scounteren)
 
-  val reg_esmcounter = io.esmcounters.map(c => WideCounter(CSR.esmWidth, c.inc))
+  val reg_esmcounter = io.esmcounters.map(c => WideCounter(CSR.esmWidth, c.inc, reset = true))
 
   val mip = Wire(init=reg_mip)
   mip.lip := (io.interrupts.lip: Seq[Bool])
@@ -851,6 +852,17 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
     t.tval := io.tval
   }
 
+
+  // printf and reset ESM counters (override writeCounter() operation)
+  when (decoded_addr(CSRs.esmcounter0) && wdata === UInt(0)) {
+    for ((c, i) <- reg_esmcounter zipWithIndex) {
+      printf("esm %d: 0x%x\n", i, c.value)
+      c := UInt(0)
+    }
+  }
+
+
+
   def chooseInterrupt(masksIn: Seq[UInt]): (Bool, UInt) = {
     val nonstandard = supported_interrupts.getWidth-1 to 12 by -1
     // MEI, MSI, MTI, SEI, SSI, STI, UEI, USI, UTI
@@ -887,14 +899,5 @@ class CSRFile(perfEventSets: EventSets = new EventSets(Seq()))(implicit p: Param
   def readEPC(x: UInt) = ~(~x | Mux(reg_misa('c' - 'a'), 1.U, 3.U))
   def isaStringToMask(s: String) = s.map(x => 1 << (x - 'A')).foldLeft(0)(_|_)
   def formFS(fs: UInt) = if (coreParams.haveFSDirty) fs else Fill(2, fs.orR)
-
-  if (CSR.ESM_LOG_PRINTF) {
-    when (reg_esmcounter(0).value === UInt(0)) {
-      for (w <- 0 until nESMCounters) {
-        printf("esm %d: 0x%x\n", w, reg_esmcounter(w))
-      }
-    }
-  }
-
 
 }
